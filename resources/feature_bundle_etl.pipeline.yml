@@ -15,6 +15,11 @@ resources:
       libraries:
         - glob:
             include: ../src/feature_bundle_etl/transformations/**
+        - pypi:
+            package: "databricks-feature-engineering"
+        - pypi:
+            package: "mlflow"
+
 
       environment:
         dependencies:

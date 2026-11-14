@@ -22,12 +22,3 @@ resources:
           environment_key: default
           pipeline_task:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
-
-      environments:
-        - environment_key: default
-          spec:
-            environment_version: "4"
-            dependencies:
-              - "scikit-learn"
-              - "databricks-feature-engineering"
-              - "mlflow"
