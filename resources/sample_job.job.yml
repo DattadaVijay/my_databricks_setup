@@ -6,6 +6,8 @@ resources:
       name: sample_job
 
       trigger:
+        pause_status: UNPAUSED
+        periodic:
           interval: 1
           unit: DAYS
 
@@ -17,7 +19,7 @@ resources:
 
       tasks:
         - task_key: transaction_data_computation
-          environmnet_key: default
+          environment_key: default
           pipeline_task:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
 
