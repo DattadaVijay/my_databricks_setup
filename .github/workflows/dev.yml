@@ -30,4 +30,4 @@ jobs:
               run: databricks bundle deploy --target dev --auto-approve
 
             - name: databricks bundle run
-              run: databricks bundle run --target dev --auto-approve
+              run: databricks bundle run sample_job --target dev --auto-approve
