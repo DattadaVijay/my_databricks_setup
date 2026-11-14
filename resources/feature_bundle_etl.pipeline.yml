@@ -1,0 +1,21 @@
+resources:
+  pipelines:
+    feature_bundle_etl:
+      name: feature_bundle_etl
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      root_path: "../src/feature_bundle_etl"
+
+      configuration:
+        pipelines.numUpdateRetryAttempts: "0"
+        pipelines.maxFlowRetryAttempts: "0"
+        pipelines.numStreamRetryAttempts: "0"
+
+      libraries:
+        - glob:
+            include: ../src/feature_bundle_etl/transformations/**
+
+      environment:
+        dependencies:
+          - --editable ${workspace.file_path}

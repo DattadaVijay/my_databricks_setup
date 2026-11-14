@@ -1,0 +1,33 @@
+bundle:
+  name: feature_bundle
+  uuid: 27e363c1-9e2b-4e2a-90bf-2a23e708606b
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: The catalog to use
+  schema:
+    description: The schema to use
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-e3761da8-7d95.cloud.databricks.com
+    variables:
+      catalog: finance_domain
+      schema: default
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-e3761da8-7d95.cloud.databricks.com
+      root_path: /Workspace/Users/dattada.vijay@gmail.com/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: finance_domain
+      schema: prod
+    permissions:
+      - user_name: dattada.vijay@gmail.com
+        level: CAN_MANAGE
