@@ -16,7 +16,7 @@ resources:
           default: ${var.schema}
 
       tasks:
-        - task_key: refresh_pipeline
+        - task_key: transaction_data_computation
           environmnet_key: default
           pipeline_task:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
@@ -25,10 +25,7 @@ resources:
         - environment_key: default
           spec:
             environment_version: "4"
-            libraries:
-              - pypi:
-                 package: "scikit-learn"
-              - pypi:
-                 package: "databricks-feature-engineering"
-              - pypi:
-                 package: "mlflow"
+            dependencies:
+              - "scikit-learn"
+              - "databricks-feature-engineering"
+              - "mlflow"
