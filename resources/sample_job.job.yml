@@ -19,6 +19,5 @@ resources:
 
       tasks:
         - task_key: transaction_data_computation
-          environment_key: default
           pipeline_task:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
