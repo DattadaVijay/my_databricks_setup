@@ -27,7 +27,7 @@ fe.create_table(
 # COMMAND ----------
 
 observations = spark.table(
-    "f"{catalog}.{schema}.gold_training_observations"
+    f"{catalog}.{schema}.gold_training_observations"
 )
 display(observations)
 
