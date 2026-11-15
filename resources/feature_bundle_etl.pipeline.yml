@@ -13,14 +13,10 @@ resources:
         pipelines.numStreamRetryAttempts: "0"
 
       libraries:
-        - glob:
-            include: ../src/feature_bundle_etl/transformations/**
-        - pypi:
-            package: "databricks-feature-engineering"
-        - pypi:
-            package: "mlflow"
-
+        - glob: "../src/feature_bundle_etl/transformations/**"
 
       environment:
         dependencies:
+          - databricks-feature-engineering
+          - mlflow
           - --editable ${workspace.file_path}
