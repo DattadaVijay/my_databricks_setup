@@ -1,0 +1,10 @@
+resources:
+  model_serving_endpoints:
+    fraud_endpoint:
+      name: fraud-detection-endpoint
+      config:
+        served_entities:
+          - entity_name: finance_domain.default.fraud_detection_model
+            entity_version: "3"
+            workload_size: Small
+            scale_to_zero_enabled: true

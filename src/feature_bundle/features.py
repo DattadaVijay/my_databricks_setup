@@ -96,3 +96,25 @@ with mlflow.start_run():
         training_set=training_set,
         registered_model_name=f"{catalog}.{schema}.fraud_detection_model"
     )
+# COMMAND ----------
+import mlflow
+from mlflow import MlflowClient
+
+mlflow.set_registry_uri("databricks-uc")
+client = MlflowClient()
+
+model_name = "finance_domain.default.fraud_detection_model"
+
+versions = client.search_model_versions(
+    f"name = '{model_name}'"
+)
+
+latest_version = max(int(v.version) for v in versions)
+
+print(latest_version)
+
+client.set_registered_model_alias(
+    name=model_name,
+    alias="Champion",
+    version=str(latest_version)
+)
