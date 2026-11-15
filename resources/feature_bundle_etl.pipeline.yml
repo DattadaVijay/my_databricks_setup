@@ -13,7 +13,8 @@ resources:
         pipelines.numStreamRetryAttempts: "0"
 
       libraries:
-        - glob: "../src/feature_bundle_etl/transformations/**"
+        - glob:
+            include: "../src/feature_bundle_etl/transformations/**"
 
       environment:
         dependencies:
