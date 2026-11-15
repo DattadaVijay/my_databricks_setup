@@ -33,4 +33,4 @@ resources:
             full_refresh: true
         - task_key: feature_tables
           notebook_task:
-            notebook_path: ../src/feature_bundle/
+            notebook_path: ../src/feature_bundle/features.py
