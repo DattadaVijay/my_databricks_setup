@@ -32,6 +32,14 @@ resources:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
             full_refresh: true
         - task_key: feature_tables
+          depends_on: 
+            - task_key: transaction_data_computation
           environment_key: default
           notebook_task:
             notebook_path: ../src/feature_bundle/features.py
+        - task_key: batch_inference
+          depends_on:
+            - task_key: feature_tables
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/feature_bundle/batch_predictions.py
