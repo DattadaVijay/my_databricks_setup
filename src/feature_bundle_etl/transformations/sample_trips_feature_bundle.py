@@ -1,13 +1,13 @@
-
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-# ==================================================
-# BRONZE: BUSINESS-PROVIDED DATA
-# ==================================================
+# ============================================================
+# BRONZE 1: CUSTOMERS
+# ============================================================
 
 @dp.materialized_view(name="bronze_customers")
 def bronze_customers():
+
     data = [
         ("C101", "John", "2024-01-01"),
         ("C102", "Sarah", "2026-09-01"),
@@ -21,32 +21,49 @@ def bronze_customers():
     )
 
 
+# ============================================================
+# BRONZE 2: TRANSACTIONS
+# ============================================================
+
 @dp.materialized_view(name="bronze_transactions")
 def bronze_transactions():
+
     data = [
         ("T001", "C101", 100.0, "2026-11-01 09:00:00"),
         ("T002", "C101", 200.0, "2026-11-03 10:00:00"),
         ("T003", "C101", 300.0, "2026-11-05 11:00:00"),
         ("T004", "C101", 5000.0, "2026-11-07 12:00:00"),
+
         ("T005", "C102", 50.0, "2026-11-02 09:00:00"),
         ("T006", "C102", 100.0, "2026-11-04 10:00:00"),
         ("T007", "C102", 1200.0, "2026-11-06 11:00:00"),
+
         ("T008", "C103", 80.0, "2026-11-03 09:00:00"),
         ("T009", "C103", 90.0, "2026-11-05 10:00:00"),
         ("T010", "C103", 95.0, "2026-11-08 11:00:00"),
+
         ("T011", "C104", 500.0, "2026-11-04 09:00:00"),
         ("T012", "C104", 3000.0, "2026-11-09 10:00:00")
     ]
 
     return spark.createDataFrame(
         data,
-        ["transaction_id", "customer_id",
-         "amount", "transaction_time"]
+        [
+            "transaction_id",
+            "customer_id",
+            "amount",
+            "transaction_time"
+        ]
     )
 
 
+# ============================================================
+# BRONZE 3: FRAUD LABELS
+# ============================================================
+
 @dp.materialized_view(name="bronze_fraud_labels")
 def bronze_fraud_labels():
+
     data = [
         ("T001", 0),
         ("T002", 0),
@@ -68,9 +85,9 @@ def bronze_fraud_labels():
     )
 
 
-# ==================================================
-# SILVER: CLEAN AND VALIDATE
-# ==================================================
+# ============================================================
+# SILVER 1: CUSTOMERS
+# ============================================================
 
 @dp.materialized_view(name="silver_customers")
 @dp.expect_or_drop(
@@ -78,6 +95,7 @@ def bronze_fraud_labels():
     "customer_id IS NOT NULL AND account_open_date IS NOT NULL"
 )
 def silver_customers():
+
     return (
         spark.read.table("bronze_customers")
         .withColumn(
@@ -88,15 +106,22 @@ def silver_customers():
     )
 
 
+# ============================================================
+# SILVER 2: TRANSACTIONS
+# ============================================================
+
 @dp.materialized_view(name="silver_transactions")
 @dp.expect_or_drop(
     "valid_transaction",
-    "transaction_id IS NOT NULL "
-    "AND customer_id IS NOT NULL "
-    "AND amount > 0 "
-    "AND transaction_time IS NOT NULL"
+    """
+    transaction_id IS NOT NULL
+    AND customer_id IS NOT NULL
+    AND amount > 0
+    AND transaction_time IS NOT NULL
+    """
 )
 def silver_transactions():
+
     return (
         spark.read.table("bronze_transactions")
         .withColumn(
@@ -107,29 +132,36 @@ def silver_transactions():
     )
 
 
+# ============================================================
+# SILVER 3: FRAUD LABELS
+# ============================================================
+
 @dp.materialized_view(name="silver_fraud_labels")
 @dp.expect_or_drop(
     "valid_label",
     "transaction_id IS NOT NULL AND is_fraud IN (0, 1)"
 )
 def silver_fraud_labels():
+
     return (
         spark.read.table("bronze_fraud_labels")
         .dropDuplicates(["transaction_id"])
     )
 
 
-# ==================================================
-# GOLD 1: CUSTOMER FEATURES AS OF A FIXED DATE
-# ==================================================
+# ============================================================
+# GOLD 1: CUSTOMER FEATURES (LATEST DEMO SNAPSHOT)
+# ============================================================
 
 @dp.materialized_view(name="gold_customer_features")
 def gold_customer_features():
 
-    # Fixed reference time makes this demo reproducible.
-    as_of = F.to_timestamp(F.lit("2026-11-10 00:00:00"))
+    # Fixed date for a reproducible demonstration.
+    as_of = F.to_timestamp(
+        F.lit("2026-11-10 00:00:00")
+    )
 
-    tx = (
+    transactions = (
         spark.read.table("silver_transactions")
         .filter(F.col("transaction_time") < as_of)
         .filter(
@@ -139,7 +171,8 @@ def gold_customer_features():
     )
 
     aggregates = (
-        tx.groupBy("customer_id")
+        transactions
+        .groupBy("customer_id")
         .agg(
             F.count("*").alias("transaction_count_7d"),
             F.avg("amount").alias("avg_amount_7d"),
@@ -154,18 +187,24 @@ def gold_customer_features():
         .join(aggregates, "customer_id", "left")
         .select(
             "customer_id",
+
+            as_of.alias("feature_timestamp"),
+
             F.coalesce(
                 F.col("transaction_count_7d"),
                 F.lit(0)
             ).alias("transaction_count_7d"),
+
             F.coalesce(
                 F.col("avg_amount_7d"),
                 F.lit(0.0)
             ).alias("avg_amount_7d"),
+
             F.coalesce(
                 F.col("max_amount_7d"),
                 F.lit(0.0)
             ).alias("max_amount_7d"),
+
             F.datediff(
                 F.to_date(as_of),
                 F.col("account_open_date")
@@ -174,9 +213,9 @@ def gold_customer_features():
     )
 
 
-# ==================================================
+# ============================================================
 # GOLD 2: LABELED TRANSACTIONS FOR TRAINING
-# ==================================================
+# ============================================================
 
 @dp.materialized_view(name="gold_training_observations")
 def gold_training_observations():
@@ -186,7 +225,11 @@ def gold_training_observations():
 
     return (
         transactions
-        .join(labels, "transaction_id", "inner")
+        .join(
+            labels,
+            on="transaction_id",
+            how="inner"
+        )
         .select(
             "transaction_id",
             "customer_id",
@@ -197,22 +240,21 @@ def gold_training_observations():
     )
 
 
-# ==================================================
-# GOLD 3: HISTORICAL FEATURES FOR TRAINING
-# ==================================================
+# ============================================================
+# GOLD 3: HISTORICAL FEATURES
+# ============================================================
 
 @dp.materialized_view(name="gold_historical_features")
 def gold_historical_features():
 
-    tx = spark.read.table("silver_transactions")
+    transactions = spark.read.table("silver_transactions")
     customers = spark.read.table("silver_customers")
 
-    current_tx = tx.alias("current")
-    history_tx = tx.alias("history")
+    current_tx = transactions.alias("current")
+    history_tx = transactions.alias("history")
 
-    # For each transaction, use only earlier transactions.
-    # transaction_id provides a deterministic tie-breaker
-    # for records sharing an event timestamp.
+    # Only use transactions that occurred before the
+    # transaction being evaluated.
     joined = current_tx.join(
         history_tx,
         (
@@ -230,20 +272,31 @@ def gold_historical_features():
     )
 
     features = (
-        joined.groupBy(
-            F.col("current.transaction_id").alias("transaction_id"),
-            F.col("current.customer_id").alias("customer_id"),
-            F.col("current.transaction_time").alias("feature_timestamp")
+        joined
+        .groupBy(
+            F.col("current.transaction_id").alias(
+                "transaction_id"
+            ),
+            F.col("current.customer_id").alias(
+                "customer_id"
+            ),
+            F.col("current.transaction_time").alias(
+                "transaction_time"
+            )
         )
         .agg(
             F.count("history.transaction_id").alias(
                 "transaction_count_7d"
             ),
+
             F.coalesce(
-                F.avg("history.amount"), F.lit(0.0)
+                F.avg("history.amount"),
+                F.lit(0.0)
             ).alias("avg_amount_7d"),
+
             F.coalesce(
-                F.max("history.amount"), F.lit(0.0)
+                F.max("history.amount"),
+                F.lit(0.0)
             ).alias("max_amount_7d")
         )
     )
@@ -251,16 +304,50 @@ def gold_historical_features():
     return (
         features
         .join(
-            customers.select("customer_id", "account_open_date"),
-            "customer_id",
-            "left"
+            customers.select(
+                "customer_id",
+                "account_open_date"
+            ),
+            on="customer_id",
+            how="left"
+        )
+        .withColumn(
+            "feature_timestamp",
+            F.expr(
+                "transaction_time - INTERVAL 1 MICROSECOND"
+            )
         )
         .withColumn(
             "account_age_days",
             F.datediff(
-                F.to_date("feature_timestamp"),
+                F.to_date("transaction_time"),
                 F.col("account_open_date")
             )
         )
-        .drop("account_open_date")
+        .select(
+            "customer_id",
+            "feature_timestamp",
+            "transaction_count_7d",
+            "avg_amount_7d",
+            "max_amount_7d",
+            "account_age_days"
+        )
     )
+
+
+# ============================================================
+# GOLD 4: UNIFIED FEATURE HISTORY
+# ============================================================
+
+@dp.materialized_view(name="gold_feature_history")
+def gold_feature_history():
+
+    historical = spark.read.table(
+        "gold_historical_features"
+    )
+
+    latest = spark.read.table(
+        "gold_customer_features"
+    )
+
+    return historical.unionByName(latest)
