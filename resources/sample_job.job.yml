@@ -32,5 +32,6 @@ resources:
             pipeline_id: ${resources.pipelines.feature_bundle_etl.id}
             full_refresh: true
         - task_key: feature_tables
+          environment_key: default
           notebook_task:
             notebook_path: ../src/feature_bundle/features.py
