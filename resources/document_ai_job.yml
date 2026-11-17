@@ -7,7 +7,7 @@ resources:
         - task_key: parse_documents
           ai_function_task:
             volume:
-              volume_path: /Volumes/${var.catalog}/${var.schema}/${resources.volumes.source_documents.name}
+              volume_path: /Volumes/${var.catalog}/${var.schema}/maintenance_source_documents
 
             output:
               catalog: ${var.catalog}
@@ -18,4 +18,4 @@ resources:
               version: "2.0"
               description_element_types:
                 - DESCRIPTION_ELEMENT_TYPE_FIGURE
-              image_output_path: /Volumes/${var.catalog}/${var.schema}/${resources.volumes.parsed_images.name}
+              image_output_path: /Volumes/${var.catalog}/${var.schema}/maintenance_parsed_images
