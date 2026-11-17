@@ -1,0 +1,21 @@
+resources:
+  jobs:
+    maintenance_rag:
+      name: maintenance-rag-pipeline
+
+      tasks:
+        - task_key: parse_documents
+          ai_function_task:
+            volume:
+              volume_path: /Volumes/${var.catalog}/${var.schema}/${resources.volumes.source_documents.name}
+
+            output:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              table: maintenance_parsed_documents
+
+            ai_parse_document:
+              version: "2.0"
+              description_element_types:
+                - DESCRIPTION_ELEMENT_TYPE_FIGURE
+              image_output_path: /Volumes/${var.catalog}/${var.schema}/${resources.volumes.parsed_images.name}
