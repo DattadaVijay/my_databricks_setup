@@ -1,4 +1,4 @@
-name: "feature serving workflow"
+name: "Rag Workflow"
 
 on:
     push:
