@@ -1,9 +1,11 @@
+
 resources:
   jobs:
     maintenance_rag:
       name: maintenance-rag-pipeline
 
       tasks:
+        # 1. Parse PDFs
         - task_key: parse_documents
           ai_function_task:
             volume:
@@ -18,3 +20,87 @@ resources:
               version: "2.0"
               description_element_types:
                 - DESCRIPTION_ELEMENT_TYPE_FIGURE
+
+        # 2. Extract structured equipment metadata
+        - task_key: extract_metadata
+          depends_on:
+            - task_key: parse_documents
+
+          ai_function_task:
+            delta_table:
+              table_name: "{{tasks.parse_documents.output.table_name}}"
+              input_column: response
+
+            output:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              table: maintenance_document_metadata
+
+            ai_extract:
+              version: "2.1"
+              schema: >-
+                {
+                  "equipment_id": {
+                    "type": "string",
+                    "description": "Equipment tag such as P-101"
+                  },
+                  "equipment_type": {
+                    "type": "string",
+                    "description": "Type of industrial equipment"
+                  },
+                  "manufacturer": {
+                    "type": "string",
+                    "description": "Manufacturer named in the document"
+                  },
+                  "maintenance_interval": {
+                    "type": "string",
+                    "description": "Recommended maintenance frequency"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "description": "Document revision identifier"
+                  }
+                }
+              instructions: >-
+                Extract equipment metadata from the maintenance
+                document. Use only information explicitly stated.
+                Do not invent missing values.
+              enable_citations: true
+              enable_confidence_scores: true
+
+        # 3. Classify document type
+        - task_key: classify_document
+          depends_on:
+            - task_key: parse_documents
+
+          ai_function_task:
+            delta_table:
+              table_name: "{{tasks.parse_documents.output.table_name}}"
+              input_column: response
+
+            output:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              table: maintenance_document_categories
+
+            ai_classify:
+              version: "2.1"
+              inline_labels:
+                labels:
+                  - name: operation_manual
+                    description: Operating and shutdown procedures
+
+                  - name: safety_procedure
+                    description: Hazards, PPE, isolation and safety
+
+                  - name: troubleshooting
+                    description: Fault diagnosis and corrective actions
+
+                  - name: other
+                    description: Documents not matching other labels
+
+              instructions: >-
+                Classify by the document's primary purpose.
+
+              enable_confidence_scores: true
+              enable_rationales: true
