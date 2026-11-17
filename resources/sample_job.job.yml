@@ -43,9 +43,9 @@ resources:
           environment_key: default
           notebook_task:
             notebook_path: ../src/feature_bundle/batch_predictions.py
-        - task_key: online_store
+        {# - task_key: online_store
           depends_on:
             - task_key: feature_tables
           environment_key: default
           notebook_task:
-            notebook_path: ../src/feature_bundle/online_store.py
+            notebook_path: ../src/feature_bundle/online_store.py #}
