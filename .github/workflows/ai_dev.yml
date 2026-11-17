@@ -32,7 +32,7 @@ jobs:
             - name: Upload maintenance manuals
               run: |
                 databricks fs cp \
-                ./src/sample_documents/ \
+                ./fixtures/pump_operation_manual.pdf/ \
                 dbfs:/Volumes/finance_domain/default/maintenance_source_documents/ \
                 --recursive \
                 --overwrite
