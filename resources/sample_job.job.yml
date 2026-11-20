@@ -43,3 +43,10 @@ resources:
           environment_key: default
           notebook_task:
             notebook_path: ../src/feature_bundle/batch_predictions.py
+            
+        - task_key: auto_tagging
+          depends_on: 
+            - task_key: batch_inference
+          environment_key: default
+          notebook_task:
+            notebook_path: ../src/contracts/sync.py
