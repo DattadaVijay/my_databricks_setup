@@ -6,7 +6,11 @@ from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 warehouse_id = "ece081f3bd7cb8a7"
 
-with open("datacontract.yaml") as f:
+from pathlib import Path
+
+contract_path = Path(__file__).resolve().parent / "datacontract.yaml"
+
+with open(contract_path) as f:
     contract = yaml.safe_load(f)
 
 for table in contract.get("schema", []):
