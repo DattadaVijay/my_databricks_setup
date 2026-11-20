@@ -1,14 +1,7 @@
 # Databricks notebook source
 
 import yaml
-from databricks.sdk import WorkspaceClient
-
-w = WorkspaceClient()
-warehouse_id = "ece081f3bd7cb8a7"
-
-from pathlib import Path
-
-contract_path = Path(__file__).resolve().parent / "datacontract.yaml"
+contract_path = dbutils.widgets.get("contract_path")
 
 with open(contract_path) as f:
     contract = yaml.safe_load(f)
