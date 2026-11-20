@@ -1,0 +1,562 @@
+
+apiVersion: v3.1.0
+kind: DataContract
+id: banking-fraud-feature-store
+name: Banking Fraud Detection and Feature Store Contract
+version: 1.0.0
+status: draft
+domain: Banking and Fraud Risk
+
+description:
+  purpose: >-
+    Govern customer profiles, banking transactions, fraud labels,
+    historical behavioral features, and machine learning training
+    datasets across the Databricks medallion architecture.
+  usage: >-
+    Supports fraud analytics, point-in-time feature engineering,
+    model training, batch inference, and online risk scoring.
+  limitations: >-
+    Fraud labels are investigation outcomes, not definitive legal
+    findings. Feature aggregates depend on the completeness of
+    upstream transactions. Currency and source timezone are not
+    explicitly defined in the current source schema.
+
+tags:
+  - banking
+  - fraud-detection
+  - machine-learning
+  - feature-engineering
+  - governed-data
+
+team:
+  name: Fraud Data Engineering
+  members: []
+
+customProperties:
+  - property: platform
+    value: Databricks
+  - property: catalog
+    value: finance_domain
+  - property: databaseSchema
+    value: default
+  - property: architecture
+    value: medallion
+  - property: deployment
+    value: Databricks Asset Bundles
+  - property: governance
+    value: Unity Catalog
+  - property: businessOwnerRole
+    value: Fraud Risk Management
+  - property: technicalOwnerRole
+    value: Data Engineering
+  - property: processingModesAreProposed
+    value: "true"
+  - property: governedTagName
+    value: data_classification
+
+servers:
+  - server: development
+    type: databricks
+    catalog: finance_domain
+    schema: default
+
+schema:
+
+  # ======================================================
+  # BRONZE LAYER
+  # ======================================================
+
+  - name: bronze_customers
+    physicalName: bronze_customers
+    businessName: Raw Customer Registry
+    description: >-
+      Raw customer profile records received from the banking
+      source system, preserving original source representations.
+    customProperties:
+      - property: layer
+        value: bronze
+      - property: processingMode
+        value: streaming
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: append
+      - property: sourceSystem
+        value: customer_registry
+      - property: grain
+        value: One incoming customer record
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        businessName: Customer Identifier
+        description: Identifier linking customer records and transactions.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: customer_name
+        logicalType: string
+        physicalType: STRING
+        businessName: Customer Full Name
+        description: Name of the customer as received from source.
+        classification: restricted
+        tags: [pii, direct_pii]
+      - name: account_open_date
+        logicalType: string
+        physicalType: STRING
+        businessName: Raw Account Opening Date
+        description: Original account opening date before type conversion.
+
+  - name: bronze_transactions
+    physicalName: bronze_transactions
+    businessName: Raw Banking Transactions
+    description: >-
+      Source transaction events used to reconstruct customer
+      activity and calculate behavioral fraud indicators.
+    customProperties:
+      - property: layer
+        value: bronze
+      - property: processingMode
+        value: streaming
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: append
+      - property: grain
+        value: One incoming transaction record
+    properties:
+      - name: transaction_id
+        logicalType: string
+        physicalType: STRING
+        businessName: Transaction Reference
+        description: Identifier assigned to a banking transaction.
+        classification: confidential
+        tags: [transaction_identifier]
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        businessName: Customer Identifier
+        description: Customer associated with the transaction.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: amount
+        logicalType: number
+        physicalType: DOUBLE
+        businessName: Transaction Amount
+        description: Transaction amount in an unspecified source currency.
+        classification: confidential
+        tags: [financial]
+      - name: transaction_time
+        logicalType: string
+        physicalType: STRING
+        businessName: Raw Transaction Timestamp
+        description: Source event time before timestamp normalization.
+
+  - name: bronze_fraud_labels
+    physicalName: bronze_fraud_labels
+    businessName: Raw Fraud Outcomes
+    description: >-
+      Raw fraud classification outcomes associated with transaction
+      identifiers, used as supervised learning targets.
+    customProperties:
+      - property: layer
+        value: bronze
+      - property: processingMode
+        value: batch
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: append
+      - property: grain
+        value: One transaction fraud outcome
+    properties:
+      - name: transaction_id
+        logicalType: string
+        physicalType: STRING
+        description: Transaction associated with the fraud outcome.
+        classification: confidential
+        tags: [transaction_identifier]
+      - name: is_fraud
+        logicalType: integer
+        physicalType: BIGINT
+        description: Fraud indicator conventionally encoded as 0 or 1.
+        classification: confidential
+        tags: [fraud_outcome]
+
+  # ======================================================
+  # SILVER LAYER
+  # ======================================================
+
+  - name: silver_customers
+    physicalName: silver_customers
+    businessName: Standardized Customer Registry
+    description: >-
+      Customer profiles with normalized account opening dates,
+      suitable for joining with transaction and feature datasets.
+    customProperties:
+      - property: layer
+        value: silver
+      - property: processingMode
+        value: incremental
+      - property: incremental
+        value: "true"
+      - property: sourceTable
+        value: bronze_customers
+      - property: grain
+        value: One standardized customer record
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Customer identifier retained from the source.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: customer_name
+        logicalType: string
+        physicalType: STRING
+        description: Customer name retained for authorized business use.
+        classification: restricted
+        tags: [pii, direct_pii]
+      - name: account_open_date
+        logicalType: date
+        physicalType: DATE
+        description: Account opening date converted to a native date.
+
+  - name: silver_transactions
+    physicalName: silver_transactions
+    businessName: Standardized Banking Transactions
+    description: >-
+      Transactions with standardized event timestamps and numeric
+      amounts for reliable feature engineering and fraud analysis.
+    customProperties:
+      - property: layer
+        value: silver
+      - property: processingMode
+        value: streaming
+      - property: incremental
+        value: "true"
+      - property: sourceTable
+        value: bronze_transactions
+      - property: grain
+        value: One standardized transaction record
+    properties:
+      - name: transaction_id
+        logicalType: string
+        physicalType: STRING
+        description: Transaction reference used for downstream joins.
+        classification: confidential
+        tags: [transaction_identifier]
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Customer associated with this transaction.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: amount
+        logicalType: number
+        physicalType: DOUBLE
+        description: Standardized numeric transaction amount.
+        classification: confidential
+        tags: [financial]
+      - name: transaction_time
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: Typed transaction event timestamp.
+
+  - name: silver_fraud_labels
+    physicalName: silver_fraud_labels
+    businessName: Validated Fraud Outcomes
+    description: >-
+      Standardized transaction fraud labels for model training
+      and historical fraud performance analysis.
+    customProperties:
+      - property: layer
+        value: silver
+      - property: processingMode
+        value: batch
+      - property: incremental
+        value: "true"
+      - property: sourceTable
+        value: bronze_fraud_labels
+      - property: grain
+        value: One standardized fraud outcome per transaction
+    properties:
+      - name: transaction_id
+        logicalType: string
+        physicalType: STRING
+        description: Reference linking the label to a transaction.
+        classification: confidential
+        tags: [transaction_identifier]
+      - name: is_fraud
+        logicalType: integer
+        physicalType: BIGINT
+        description: Binary fraud outcome intended to contain 0 or 1.
+        classification: confidential
+        tags: [fraud_outcome]
+
+  # ======================================================
+  # GOLD LAYER
+  # ======================================================
+
+  - name: gold_customer_features
+    physicalName: gold_customer_features
+    businessName: Customer Behavioral Feature Snapshot
+    description: >-
+      Customer-level behavioral aggregates measuring recent
+      transaction activity and account tenure for fraud scoring.
+    customProperties:
+      - property: layer
+        value: gold
+      - property: processingMode
+        value: batch
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: scheduled
+      - property: grain
+        value: One customer per feature timestamp
+      - property: consumer
+        value: fraud_feature_engineering
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Customer for whom features were calculated.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: feature_timestamp
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: Timestamp associated with the feature snapshot.
+      - name: transaction_count_7d
+        logicalType: integer
+        physicalType: BIGINT
+        description: Number of transactions in the preceding seven days.
+      - name: avg_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Average transaction amount over seven days.
+        classification: confidential
+        tags: [derived_financial]
+      - name: max_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Maximum transaction amount over seven days.
+        classification: confidential
+        tags: [derived_financial]
+      - name: account_age_days
+        logicalType: integer
+        physicalType: INT
+        description: Account age expressed as a number of days.
+
+  - name: gold_historical_features
+    physicalName: gold_historical_features
+    businessName: Historical Customer Behavioral Features
+    description: >-
+      Historical feature observations used to analyze customer
+      behavior over time and support time-aware model development.
+    customProperties:
+      - property: layer
+        value: gold
+      - property: processingMode
+        value: batch
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: scheduled
+      - property: grain
+        value: One customer per historical feature timestamp
+      - property: consumer
+        value: historical_fraud_analysis
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Customer associated with historical features.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: feature_timestamp
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: Historical feature observation timestamp.
+      - name: transaction_count_7d
+        logicalType: integer
+        physicalType: BIGINT
+        description: Seven-day transaction count at observation time.
+      - name: avg_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Historical seven-day average transaction amount.
+        classification: confidential
+        tags: [derived_financial]
+      - name: max_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Historical seven-day maximum transaction amount.
+        classification: confidential
+        tags: [derived_financial]
+      - name: account_age_days
+        logicalType: integer
+        physicalType: INT
+        description: Customer account age at observation time.
+
+  - name: gold_feature_history
+    physicalName: gold_feature_history
+    businessName: Point-in-Time Fraud Feature History
+    description: >-
+      Time-indexed customer feature history supporting temporal
+      feature lookups and reducing training-serving leakage.
+    customProperties:
+      - property: layer
+        value: gold
+      - property: processingMode
+        value: incremental
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: historical_upsert
+      - property: grain
+        value: One customer per feature timestamp
+      - property: consumer
+        value: databricks_feature_engineering
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Entity key used for customer feature lookups.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: feature_timestamp
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: Time key used for point-in-time feature lookup.
+      - name: transaction_count_7d
+        logicalType: integer
+        physicalType: BIGINT
+        description: Seven-day transaction count at feature time.
+      - name: avg_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Seven-day average transaction amount at feature time.
+        classification: confidential
+        tags: [derived_financial]
+      - name: max_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Seven-day maximum transaction amount at feature time.
+        classification: confidential
+        tags: [derived_financial]
+      - name: account_age_days
+        logicalType: integer
+        physicalType: INT
+        description: Account tenure in days at feature time.
+
+  - name: gold_training_observations
+    physicalName: gold_training_observations
+    businessName: Fraud Model Training Observations
+    description: >-
+      Transaction-level labeled observations used to construct
+      supervised training datasets with historical feature lookups.
+    customProperties:
+      - property: layer
+        value: gold
+      - property: processingMode
+        value: batch
+      - property: incremental
+        value: "false"
+      - property: refreshStrategy
+        value: training_dataset_build
+      - property: grain
+        value: One labeled transaction observation
+      - property: consumer
+        value: fraud_model_training
+    properties:
+      - name: transaction_id
+        logicalType: string
+        physicalType: STRING
+        description: Transaction reference for the training observation.
+        classification: confidential
+        tags: [transaction_identifier]
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        description: Entity key for joining historical customer features.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: transaction_time
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: Event time used for point-in-time feature lookups.
+      - name: amount
+        logicalType: number
+        physicalType: DOUBLE
+        description: Transaction amount available to the fraud model.
+        classification: confidential
+        tags: [financial]
+      - name: is_fraud
+        logicalType: integer
+        physicalType: BIGINT
+        description: Binary supervised learning target.
+        classification: confidential
+        tags: [fraud_outcome]
+
+  # ======================================================
+  # FEATURE STORE
+  # ======================================================
+
+  - name: customer_feature_store
+    physicalName: customer_feature_store
+    businessName: Customer Fraud Feature Store
+    description: >-
+      Governed customer feature table keyed by customer and
+      feature timestamp, supporting reusable model features
+      and historical feature retrieval.
+    customProperties:
+      - property: layer
+        value: feature_store
+      - property: processingMode
+        value: incremental
+      - property: incremental
+        value: "true"
+      - property: refreshStrategy
+        value: merge
+      - property: grain
+        value: One customer per feature timestamp
+      - property: entityKey
+        value: customer_id
+      - property: timeseriesKey
+        value: feature_timestamp
+      - property: consumer
+        value: ml_training_and_inference
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: STRING
+        required: true
+        description: Non-null customer entity lookup key.
+        classification: confidential
+        tags: [pii, pseudonymous]
+      - name: feature_timestamp
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+        description: Non-null timestamp for temporal feature lookup.
+      - name: transaction_count_7d
+        logicalType: integer
+        physicalType: BIGINT
+        description: Seven-day transaction count feature.
+      - name: avg_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Seven-day average transaction amount feature.
+        classification: confidential
+        tags: [derived_financial]
+      - name: max_amount_7d
+        logicalType: number
+        physicalType: DOUBLE
+        description: Seven-day maximum transaction amount feature.
+        classification: confidential
+        tags: [derived_financial]
+      - name: account_age_days
+        logicalType: integer
+        physicalType: INT
+        description: Customer account tenure feature in days.
