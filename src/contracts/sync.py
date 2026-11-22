@@ -41,15 +41,6 @@ for table in contract.get("schema", []):
 
 # COMMAND ----------
 %sql
-CREATE GOVERNED TAG data_classification
-DESCRIPTION 'Classification of sensitive banking information'
-VALUES (
-  'direct_pii',
-  'pseudonymous',
-  'confidential'
-);
-# COMMAND ----------
-%sql
 CREATE OR REPLACE FUNCTION finance_domain.default.mask_direct_pii(v STRING)
 RETURNS STRING
 RETURN IF(v IS NULL, NULL, '****');
