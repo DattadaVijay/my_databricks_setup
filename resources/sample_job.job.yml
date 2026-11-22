@@ -51,4 +51,4 @@ resources:
           notebook_task:
             notebook_path: ../src/contracts/sync.py
             base_parameters:
-              contract_path: ${workspace.file_path}/src/contracts/datacontract.yaml
+              contract_path: "/Workspace/Users/dattada.vijay@gmail.com/.bundle/feature_bundle/dev/files/fixtures/datacontract.yaml"
