@@ -54,7 +54,7 @@ CREATE POLICY mask_direct_pii_policy
 ON SCHEMA finance_domain.default
 COMMENT 'Mask direct PII'
 COLUMN MASK finance_domain.default.mask_direct_pii
-TO `account users` EXCEPT `fraud_pii_readers`
+TO `account users`
 FOR TABLES
 MATCH COLUMNS
   has_tag_value('data_classification', 'direct_pii') AS col
@@ -66,7 +66,7 @@ CREATE POLICY mask_pseudonymous_policy
 ON SCHEMA finance_domain.default
 COMMENT 'Mask customer identifiers'
 COLUMN MASK finance_domain.default.mask_pseudonymous
-TO `account users` EXCEPT `fraud_pii_readers`
+TO `account users`
 FOR TABLES
 MATCH COLUMNS
   has_tag_value('data_classification', 'pseudonymous') AS col
