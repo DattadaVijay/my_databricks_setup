@@ -1,5 +1,5 @@
 # Databricks notebook source
-
+%python
 import yaml
 from databricks.sdk import WorkspaceClient
 
@@ -26,19 +26,24 @@ for table in contract.get("schema", []):
             continue
 
         sql = f"""
-        SET TAG ON COLUMN
-          `finance_domain`.`default`.`{table_name}`.`{column['name']}`
-          `data_classification` = '{classification}'
+        ALTER TABLE `finance_domain`.`default`.`{table_name}`
+        ALTER COLUMN `{column['name']}`
+        SET TAGS ('data_classification' = '{classification}')
         """
 
-        w.statement_execution.execute_statement(
+        resp = w.statement_execution.execute_statement(
             warehouse_id=warehouse_id,
             statement=sql,
             wait_timeout="30s"
         )
 
-        print(f"{table_name}.{column['name']} → {classification}")
+        if resp.status.state != "SUCCEEDED":
+            raise RuntimeError(
+                f"Tagging {table_name}.{column['name']} failed: "
+                f"{resp.status.error.message}"
+            )
 
+        print(f"{table_name}.{column['name']} → {classification}")
 # COMMAND ----------
 %sql
 CREATE OR REPLACE FUNCTION finance_domain.default.mask_direct_pii(v STRING)
