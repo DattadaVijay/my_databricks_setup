@@ -38,3 +38,51 @@ for table in contract.get("schema", []):
         )
 
         print(f"{table_name}.{column['name']} → {classification}")
+
+# COMMAND ----------
+%sql
+CREATE GOVERNED TAG data_classification
+DESCRIPTION 'Classification of sensitive banking information'
+VALUES (
+  'direct_pii',
+  'pseudonymous',
+  'confidential'
+);
+# COMMAND ----------
+%sql
+CREATE OR REPLACE FUNCTION finance_domain.default.mask_direct_pii(v STRING)
+RETURNS STRING
+RETURN IF(v IS NULL, NULL, '****');
+
+CREATE OR REPLACE FUNCTION finance_domain.default.mask_pseudonymous(v STRING)
+RETURNS STRING
+RETURN IF(v IS NULL, NULL, CONCAT('****', RIGHT(v, 4)));
+# COMMAND ----------
+%sql
+CREATE POLICY mask_direct_pii_policy
+ON SCHEMA finance_domain.default
+COMMENT 'Mask direct PII'
+COLUMN MASK finance_domain.default.mask_direct_pii
+TO `account users` EXCEPT `fraud_pii_readers`
+FOR TABLES
+MATCH COLUMNS
+  has_tag_value('data_classification', 'direct_pii') AS col
+ON COLUMN col;
+
+# COMMAND ----------
+%sql
+CREATE POLICY mask_pseudonymous_policy
+ON SCHEMA finance_domain.default
+COMMENT 'Mask customer identifiers'
+COLUMN MASK finance_domain.default.mask_pseudonymous
+TO `account users` EXCEPT `fraud_pii_readers`
+FOR TABLES
+MATCH COLUMNS
+  has_tag_value('data_classification', 'pseudonymous') AS col
+ON COLUMN col;
+
+# COMMAND ----------
+%sql
+SELECT customer_id, customer_name
+FROM finance_domain.default.silver_customers
+LIMIT 5;
