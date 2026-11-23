@@ -1,10 +1,6 @@
 # Databricks notebook source
 %python
 import yaml
-from databricks.sdk import WorkspaceClient
-
-w = WorkspaceClient()
-warehouse_id = "ece081f3bd7cb8a7"  # Serverless Starter Warehouse
 
 contract_path = dbutils.widgets.get("contract_path")
 
@@ -31,17 +27,7 @@ for table in contract.get("schema", []):
         SET TAGS ('data_classification' = '{classification}')
         """
 
-        resp = w.statement_execution.execute_statement(
-            warehouse_id=warehouse_id,
-            statement=sql,
-            wait_timeout="30s"
-        )
-
-        if resp.status.state != "SUCCEEDED":
-            raise RuntimeError(
-                f"Tagging {table_name}.{column['name']} failed: "
-                f"{resp.status.error.message}"
-            )
+        spark.sql(sql)
 
         print(f"{table_name}.{column['name']} → {classification}")
 # COMMAND ----------
