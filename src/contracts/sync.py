@@ -41,7 +41,7 @@ RETURNS STRING
 RETURN IF(v IS NULL, NULL, CONCAT('****', RIGHT(v, 4)));
 # COMMAND ----------
 %sql
-CREATE POLICY mask_direct_pii_policy
+CREATE OR REPLACE POLICY mask_direct_pii_policy
 ON SCHEMA finance_domain.default
 COMMENT 'Mask direct PII'
 COLUMN MASK finance_domain.default.mask_direct_pii
@@ -53,7 +53,7 @@ ON COLUMN col;
 
 # COMMAND ----------
 %sql
-CREATE POLICY mask_pseudonymous_policy
+CREATE OR REPLACE POLICY mask_pseudonymous_policy
 ON SCHEMA finance_domain.default
 COMMENT 'Mask customer identifiers'
 COLUMN MASK finance_domain.default.mask_pseudonymous
